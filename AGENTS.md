@@ -66,9 +66,9 @@ make uninstall
 `make install` does these steps:
 1. `swift build -c release`
 2. Kills any running hyperkey instance
-3. `tccutil reset Accessibility com.feedthejim.hyperkey` (clears stale TCC entry from previous binary)
+3. `tccutil reset Accessibility com.smallmain.hyperkey` (clears stale TCC entry from previous binary)
 4. Creates app bundle with Info.plist and AppIcon.icns
-5. `codesign -f -s - --identifier com.feedthejim.hyperkey` (ad-hoc sign with stable identifier)
+5. `codesign -f -s - --identifier com.smallmain.hyperkey` (ad-hoc sign with stable identifier)
 6. Copies to `/Applications/Hyperkey.app`
 7. Opens the app
 
@@ -91,7 +91,7 @@ Releases are automated via GitHub Actions (`.github/workflows/release.yml`):
 - To test external keyboard handling, watch for "seized external keyboard" in logs
 - If keys double on external keyboard: only the first successful seizure per physical keyboard should have a callback registered. Check that seizure failures are skipped (not opened non-exclusively)
 - If app appears frozen on first launch: ensure `Accessibility.ensureAccessibility()` uses `CFRunLoopRunInMode`, not `Thread.sleep`
-- If accessibility permission doesn't work after toggling: the TCC entry is stale (CDHash mismatch). Run `tccutil reset Accessibility com.feedthejim.hyperkey` and re-grant
+- If accessibility permission doesn't work after toggling: the TCC entry is stale (CDHash mismatch). Run `tccutil reset Accessibility com.smallmain.hyperkey` and re-grant
 - IOKit HID seizure ONLY affects HID-class keyboard devices (usage page 0x07, usage 0x06). It does NOT affect USB audio, displays, or other non-HID USB devices
 
 ## Known Issues / Gotchas

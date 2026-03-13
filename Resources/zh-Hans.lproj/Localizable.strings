@@ -1,0 +1,50 @@
+"app.name" = "Hyperkey";
+"status_item.fallback_title" = "HK";
+
+"menu.version" = "%@ v%@";
+"menu.update_available" = "发现更新";
+"menu.update_available_version" = "发现更新：v%@";
+"menu.update_now" = "立即更新";
+"menu.downloading_update" = "正在下载更新...";
+"menu.check_for_updates" = "检查更新";
+"menu.checking_for_updates" = "正在检查...";
+"menu.keyboards" = "键盘";
+"menu.no_keyboards" = "未检测到键盘";
+"menu.escape_on_tap" = "单独按 CapsLock → Escape";
+"menu.hyper_navigation" = "Hyper + HJKL → 方向键";
+"menu.launch_at_login" = "登录时启动";
+"menu.quit" = "退出%@";
+"menu.up_to_date" = "已是最新版本";
+
+"warning.waiting_accessibility" = "正在等待辅助功能权限...";
+"warning.accessibility_revoked" = "警告：辅助功能权限已被撤销";
+"warning.hid_mapping_failed" = "警告：HID 映射失败";
+
+"keyboard.status.built_in" = "内建";
+"keyboard.status.seized" = "已接管";
+"keyboard.status.skipped" = "已跳过";
+"keyboard.name.unknown" = "未知键盘";
+"keyboard.item" = "%@（%@）";
+
+"alert.update_check_failed.title" = "无法检查更新";
+"alert.update_failed.title" = "更新失败";
+"alert.ok" = "好";
+
+"update_check.error.invalid_response" = "GitHub 返回了无效响应，无法检查更新。";
+"update_check.error.github_status" = "检查更新时，GitHub 返回了 HTTP %d。";
+"update_check.error.decode_failed" = "GitHub 返回的 Release 数据格式不符合预期。";
+"update_check.error.network_failure" = "无法连接到 GitHub：%@";
+
+"updater.error.missing_download_url" = "这个 Release 没有可下载的应用包。";
+"updater.error.invalid_download_url" = "GitHub 为这个 Release 返回了无效的下载地址。";
+"updater.error.unsupported_installation" = "只有当 %@ 以 .app 应用包形式运行时，才能立即更新。";
+"updater.error.download_failed" = "下载更新时，GitHub 返回了 HTTP %d。";
+"updater.error.network_failure" = "无法下载更新：%@";
+"updater.error.extracted_app_not_found" = "下载的压缩包里没有找到 %@ 应用包。";
+"updater.error.prepare_temp_directory" = "无法准备临时更新目录。";
+"updater.error.stage_download" = "无法暂存下载好的更新文件。";
+"updater.error.unpack_download" = "无法解压下载的更新包。";
+"updater.error.invalid_response" = "GitHub 返回了无效响应。";
+"updater.error.inspect_download" = "无法检查下载的更新内容。";
+"updater.error.prepare_installer" = "无法准备更新安装器。";
+"updater.error.launch_installer" = "无法启动更新安装器。";

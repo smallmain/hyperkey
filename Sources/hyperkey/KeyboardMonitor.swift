@@ -15,7 +15,24 @@ nonisolated(unsafe) private var currentModifierFlags: UInt64 = 0
 /// Connected keyboard info for menu display.
 struct KeyboardInfo {
     let name: String
-    let status: String // "Built-in", "Seized", "Skipped"
+    let status: KeyboardStatus
+}
+
+enum KeyboardStatus {
+    case builtIn
+    case seized
+    case skipped
+
+    var localizedTitle: String {
+        switch self {
+        case .builtIn:
+            return L10n.tr("keyboard.status.built_in", default: "Built-in")
+        case .seized:
+            return L10n.tr("keyboard.status.seized", default: "Seized")
+        case .skipped:
+            return L10n.tr("keyboard.status.skipped", default: "Skipped")
+        }
+    }
 }
 
 enum KeyboardMonitor {
@@ -59,7 +76,8 @@ private func isBuiltIn(_ device: IOHIDDevice) -> Bool {
 }
 
 private func productName(_ device: IOHIDDevice) -> String {
-    IOHIDDeviceGetProperty(device, kIOHIDProductKey as CFString) as? String ?? "unknown"
+    IOHIDDeviceGetProperty(device, kIOHIDProductKey as CFString) as? String
+        ?? L10n.tr("keyboard.name.unknown", default: "Unknown Keyboard")
 }
 
 // MARK: - Device Connect/Disconnect Callbacks
@@ -75,7 +93,7 @@ private func deviceConnectedCallback(
     if isBuiltIn(device) {
         fputs("hyperkey: built-in keyboard (\(name)), using CGEventTap path\n", stderr)
         HIDMapping.applyCapsLockToF18()
-        KeyboardMonitor.connectedDevices.append(KeyboardInfo(name: name, status: "Built-in"))
+        KeyboardMonitor.connectedDevices.append(KeyboardInfo(name: name, status: .builtIn))
         return
     }
 
@@ -87,7 +105,7 @@ private func deviceConnectedCallback(
     if seizeResult == kIOReturnSuccess {
         IOHIDDeviceRegisterInputValueCallback(device, hidInputCallback, nil)
         fputs("hyperkey: seized external keyboard (\(name))\n", stderr)
-        KeyboardMonitor.connectedDevices.append(KeyboardInfo(name: name, status: "Seized"))
+        KeyboardMonitor.connectedDevices.append(KeyboardInfo(name: name, status: .seized))
     } else {
         fputs("hyperkey: skipping \(name) (could not seize, error \(seizeResult))\n", stderr)
     }
@@ -158,7 +176,12 @@ private func hidInputCallback(
     if let keyCode = HIDKeyTable.virtualKeyCode(forUsage: usage) {
         if hyperActive {
             hyperUsedAsModifier = true
-            injectKey(keyCode: keyCode, keyDown: pressed, addHyperFlags: true)
+            let remappedKeyCode = HyperNavigationMapping.arrowKeyCode(forVirtualKeyCode: Int64(keyCode))
+            injectKey(
+                keyCode: remappedKeyCode ?? keyCode,
+                keyDown: pressed,
+                addHyperFlags: remappedKeyCode == nil
+            )
         } else {
             injectKey(keyCode: keyCode, keyDown: pressed)
         }

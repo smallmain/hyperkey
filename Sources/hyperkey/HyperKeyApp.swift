@@ -33,16 +33,7 @@ struct HyperKeyApp {
             return
         }
 
-        // 2. Check accessibility permissions (waits until granted)
-        Accessibility.ensureAccessibility()
-
-        // 3. Apply CapsLock -> F18 mapping via hidutil
-        let hidMappingOK = HIDMapping.applyCapsLockToF18()
-
-        // 4. Monitor for keyboard connect/disconnect and seize external keyboards
-        KeyboardMonitor.start()
-
-        // 5. Set up signal handlers for clean shutdown
+        // 2. Set up signal handlers for clean shutdown
         signal(SIGINT) { _ in
             HIDMapping.clearMapping()
             fputs("\nhyperkey: stopped, CapsLock mapping cleared.\n", stderr)
@@ -54,14 +45,11 @@ struct HyperKeyApp {
             exit(0)
         }
 
-        // 6. Start the event tap (runs on the main run loop)
-        EventTap.start()
-
-        // 7. Set up NSApplication with menu bar item
+        // 3. Set up NSApplication with menu bar item
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
 
-        let delegate = AppDelegate(hidMappingOK: hidMappingOK)
+        let delegate = AppDelegate()
         app.delegate = delegate
 
         app.run()
@@ -72,48 +60,76 @@ struct HyperKeyApp {
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private var updateMenuItem: NSMenuItem!
+    private var installUpdateItem: NSMenuItem!
     private var checkForUpdatesItem: NSMenuItem!
     private var warningMenuItem: NSMenuItem!
     private var keyboardsMenuItem: NSMenuItem!
-    private var updateURL: String?
-    private let hidMappingOK: Bool
+    private var updateInfo: UpdateChecker.UpdateInfo?
+    private var hidMappingOK = true
+    private var servicesStarted = false
+    private var isInstallingUpdate = false
 
     private let escapeKey = "escapeOnTap"
-
-    init(hidMappingOK: Bool) {
-        self.hidMappingOK = hidMappingOK
-        super.init()
-    }
+    private let hyperNavigationKey = "hyperNavigationEnabled"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let savedEscape = UserDefaults.standard.bool(forKey: escapeKey)
+        let savedHyperNavigation = UserDefaults.standard.bool(forKey: hyperNavigationKey)
         escapeOnTap = savedEscape
+        hyperNavigationEnabled = savedHyperNavigation
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
         if let button = statusItem.button {
-            button.image = NSImage(
+            button.toolTip = L10n.appName
+            if let image = NSImage(
                 systemSymbolName: "capslock.fill",
-                accessibilityDescription: "Hyperkey"
-            )
+                accessibilityDescription: L10n.appName
+            ) {
+                image.isTemplate = true
+                button.image = image
+            } else {
+                button.title = L10n.tr("status_item.fallback_title", default: "HK")
+            }
         }
 
         let menu = NSMenu()
         menu.delegate = self
 
         // Version
-        let statusMenuItem = NSMenuItem(title: "Hyperkey v\(Constants.version)", action: nil, keyEquivalent: "")
+        let statusMenuItem = NSMenuItem(
+            title: L10n.tr("menu.version", default: "%@ v%@", L10n.appName, Constants.version),
+            action: nil,
+            keyEquivalent: ""
+        )
         statusMenuItem.isEnabled = false
         menu.addItem(statusMenuItem)
 
         // Update available (hidden until detected)
-        updateMenuItem = NSMenuItem(title: "Update available", action: #selector(openUpdate(_:)), keyEquivalent: "")
+        updateMenuItem = NSMenuItem(
+            title: L10n.tr("menu.update_available", default: "Update available"),
+            action: #selector(openUpdate(_:)),
+            keyEquivalent: ""
+        )
         updateMenuItem.target = self
         updateMenuItem.isHidden = true
         menu.addItem(updateMenuItem)
 
+        installUpdateItem = NSMenuItem(
+            title: L10n.tr("menu.update_now", default: "Update Now"),
+            action: #selector(installUpdate(_:)),
+            keyEquivalent: ""
+        )
+        installUpdateItem.target = self
+        installUpdateItem.isHidden = true
+        menu.addItem(installUpdateItem)
+
         // Check for Updates
-        checkForUpdatesItem = NSMenuItem(title: "Check for Updates", action: #selector(checkForUpdates(_:)), keyEquivalent: "")
+        checkForUpdatesItem = NSMenuItem(
+            title: L10n.tr("menu.check_for_updates", default: "Check for Updates"),
+            action: #selector(checkForUpdates(_:)),
+            keyEquivalent: ""
+        )
         checkForUpdatesItem.target = self
         menu.addItem(checkForUpdatesItem)
 
@@ -122,15 +138,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         warningMenuItem.isHidden = true
         menu.addItem(warningMenuItem)
 
-        if !hidMappingOK {
-            warningMenuItem.title = "Warning: HID mapping failed"
-            warningMenuItem.isHidden = false
-        }
-
         menu.addItem(NSMenuItem.separator())
 
         // Keyboards submenu
-        keyboardsMenuItem = NSMenuItem(title: "Keyboards", action: nil, keyEquivalent: "")
+        keyboardsMenuItem = NSMenuItem(
+            title: L10n.tr("menu.keyboards", default: "Keyboards"),
+            action: nil,
+            keyEquivalent: ""
+        )
         let keyboardsSubmenu = NSMenu()
         keyboardsMenuItem.submenu = keyboardsSubmenu
         menu.addItem(keyboardsMenuItem)
@@ -139,7 +154,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         // CapsLock -> Escape toggle
         let escapeItem = NSMenuItem(
-            title: "CapsLock alone \u{2192} Escape",
+            title: L10n.tr("menu.escape_on_tap", default: "CapsLock alone → Escape"),
             action: #selector(toggleEscape(_:)),
             keyEquivalent: ""
         )
@@ -147,9 +162,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         escapeItem.state = savedEscape ? .on : .off
         menu.addItem(escapeItem)
 
+        let hyperNavigationItem = NSMenuItem(
+            title: L10n.tr("menu.hyper_navigation", default: "Hyper + HJKL → Arrows"),
+            action: #selector(toggleHyperNavigation(_:)),
+            keyEquivalent: ""
+        )
+        hyperNavigationItem.target = self
+        hyperNavigationItem.state = savedHyperNavigation ? .on : .off
+        menu.addItem(hyperNavigationItem)
+
         // Launch at Login toggle
         let launchItem = NSMenuItem(
-            title: "Launch at Login",
+            title: L10n.tr("menu.launch_at_login", default: "Launch at Login"),
             action: #selector(toggleLaunchAtLogin(_:)),
             keyEquivalent: ""
         )
@@ -161,7 +185,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         // Quit
         let quitItem = NSMenuItem(
-            title: "Quit Hyperkey",
+            title: L10n.tr("menu.quit", default: "Quit %@", L10n.appName),
             action: #selector(quitApp(_:)),
             keyEquivalent: "q"
         )
@@ -172,6 +196,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         // Check for updates (uses 24h cache)
         Task { await performUpdateCheck() }
+
+        warningMenuItem.title = L10n.tr(
+            "warning.waiting_accessibility",
+            default: "Waiting for Accessibility permission..."
+        )
+        warningMenuItem.isHidden = AXIsProcessTrusted()
+
+        DispatchQueue.main.async { [weak self] in
+            self?.startKeyboardServicesWhenReady()
+        }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        HIDMapping.clearMapping()
     }
 
     // MARK: - NSMenuDelegate
@@ -179,7 +217,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func menuWillOpen(_ menu: NSMenu) {
         // Check accessibility on every menu open
         if !AXIsProcessTrusted() {
-            warningMenuItem.title = "Warning: Accessibility permission revoked"
+            warningMenuItem.title = servicesStarted
+                ? L10n.tr(
+                    "warning.accessibility_revoked",
+                    default: "Warning: Accessibility permission revoked"
+                )
+                : L10n.tr(
+                    "warning.waiting_accessibility",
+                    default: "Waiting for Accessibility permission..."
+                )
             warningMenuItem.isHidden = false
         } else if hidMappingOK {
             warningMenuItem.isHidden = true
@@ -190,12 +236,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             submenu.removeAllItems()
             let devices = KeyboardMonitor.connectedDevices
             if devices.isEmpty {
-                let item = NSMenuItem(title: "No keyboards detected", action: nil, keyEquivalent: "")
+                let item = NSMenuItem(
+                    title: L10n.tr("menu.no_keyboards", default: "No keyboards detected"),
+                    action: nil,
+                    keyEquivalent: ""
+                )
                 item.isEnabled = false
                 submenu.addItem(item)
             } else {
                 for device in devices {
-                    let item = NSMenuItem(title: "\(device.name) (\(device.status))", action: nil, keyEquivalent: "")
+                    let item = NSMenuItem(
+                        title: L10n.tr(
+                            "keyboard.item",
+                            default: "%@ (%@)",
+                            device.name,
+                            device.status.localizedTitle
+                        ),
+                        action: nil,
+                        keyEquivalent: ""
+                    )
                     item.isEnabled = false
                     submenu.addItem(item)
                 }
@@ -212,18 +271,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         UserDefaults.standard.set(newValue, forKey: escapeKey)
     }
 
+    @objc private func toggleHyperNavigation(_ sender: NSMenuItem) {
+        let newValue = sender.state != .on
+        hyperNavigationEnabled = newValue
+        sender.state = newValue ? .on : .off
+        UserDefaults.standard.set(newValue, forKey: hyperNavigationKey)
+    }
+
     @objc private func openUpdate(_ sender: NSMenuItem) {
-        if let urlString = updateURL, let url = URL(string: urlString) {
+        if let urlString = updateInfo?.releasePageURL, let url = URL(string: urlString) {
             NSWorkspace.shared.open(url)
         }
     }
 
+    @objc private func installUpdate(_ sender: NSMenuItem) {
+        guard !isInstallingUpdate, let update = updateInfo else { return }
+        guard update.downloadURL != nil else {
+            openUpdate(sender)
+            return
+        }
+
+        isInstallingUpdate = true
+        installUpdateItem.title = L10n.tr(
+            "menu.downloading_update",
+            default: "Downloading Update..."
+        )
+        installUpdateItem.isEnabled = false
+        updateMenuItem.isEnabled = false
+        checkForUpdatesItem.isEnabled = false
+
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await AppUpdater.install(update: update)
+            } catch {
+                self.handleUpdateFailure(error, update: update)
+            }
+        }
+    }
+
     @objc private func checkForUpdates(_ sender: NSMenuItem) {
-        sender.title = "Checking..."
+        sender.title = L10n.tr("menu.checking_for_updates", default: "Checking...")
         sender.isEnabled = false
         Task {
             await performUpdateCheck(force: true)
-            sender.title = "Check for Updates"
+            sender.title = L10n.tr("menu.check_for_updates", default: "Check for Updates")
             sender.isEnabled = true
         }
     }
@@ -319,19 +411,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - Helpers
 
     private func performUpdateCheck(force: Bool = false) async {
-        if let (version, url) = await UpdateChecker.check(force: force) {
-            updateMenuItem.title = "Update available: v\(version)"
-            updateMenuItem.isHidden = false
-            updateURL = url
-        } else if force {
-            updateMenuItem.title = "Up to date"
-            updateMenuItem.isHidden = false
-            updateURL = nil
-            // Hide "up to date" after 5 seconds
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
-                if self?.updateURL == nil {
-                    self?.updateMenuItem.isHidden = true
+        do {
+            if let update = try await UpdateChecker.check(force: force) {
+                updateInfo = update
+                updateMenuItem.title = L10n.tr(
+                    "menu.update_available_version",
+                    default: "Update available: v%@",
+                    update.version
+                )
+                updateMenuItem.isHidden = false
+                updateMenuItem.isEnabled = !isInstallingUpdate
+                installUpdateItem.title = isInstallingUpdate
+                    ? L10n.tr("menu.downloading_update", default: "Downloading Update...")
+                    : L10n.tr("menu.update_now", default: "Update Now")
+                installUpdateItem.isHidden = update.downloadURL == nil
+                installUpdateItem.isEnabled = !isInstallingUpdate && update.downloadURL != nil
+            } else if force {
+                updateInfo = nil
+                updateMenuItem.title = L10n.tr("menu.up_to_date", default: "Up to date")
+                updateMenuItem.isHidden = false
+                updateMenuItem.isEnabled = false
+                installUpdateItem.isHidden = true
+                // Hide "up to date" after 5 seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+                    if self?.updateInfo == nil {
+                        self?.updateMenuItem.isHidden = true
+                    }
                 }
+            }
+        } catch {
+            fputs("hyperkey: update check failed: \(error)\n", stderr)
+            if force {
+                showAlert(
+                    title: L10n.tr(
+                        "alert.update_check_failed.title",
+                        default: "Unable to Check for Updates"
+                    ),
+                    message: error.localizedDescription
+                )
             }
         }
     }
@@ -340,5 +457,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let plistPath = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/LaunchAgents/\(Constants.bundleID).plist")
         return FileManager.default.fileExists(atPath: plistPath.path)
+    }
+
+    private func startKeyboardServicesWhenReady() {
+        guard !servicesStarted else { return }
+        Accessibility.waitForPermission { [weak self] in
+            self?.startKeyboardServices()
+        }
+    }
+
+    private func startKeyboardServices() {
+        guard !servicesStarted else { return }
+        hidMappingOK = HIDMapping.applyCapsLockToF18()
+        if !hidMappingOK {
+            warningMenuItem.title = L10n.tr(
+                "warning.hid_mapping_failed",
+                default: "Warning: HID mapping failed"
+            )
+            warningMenuItem.isHidden = false
+        } else {
+            warningMenuItem.isHidden = true
+        }
+
+        KeyboardMonitor.start()
+        EventTap.start()
+        servicesStarted = true
+    }
+
+    private func handleUpdateFailure(_ error: Error, update: UpdateChecker.UpdateInfo) {
+        isInstallingUpdate = false
+        updateInfo = update
+        updateMenuItem.isEnabled = true
+        installUpdateItem.title = L10n.tr("menu.update_now", default: "Update Now")
+        installUpdateItem.isHidden = update.downloadURL == nil
+        installUpdateItem.isEnabled = update.downloadURL != nil
+        checkForUpdatesItem.isEnabled = true
+
+        showAlert(
+            title: L10n.tr("alert.update_failed.title", default: "Update Failed"),
+            message: error.localizedDescription
+        )
+    }
+
+    private func showAlert(title: String, message: String) {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.addButton(withTitle: L10n.tr("alert.ok", default: "OK"))
+        alert.runModal()
     }
 }

@@ -31,7 +31,8 @@ jobs:
           cp .build/apple/Products/Release/hyperkey Hyperkey.app/Contents/MacOS/
           cp Info.plist Hyperkey.app/Contents/
           cp AppIcon.icns Hyperkey.app/Contents/Resources/
-          codesign -f -s - --identifier com.feedthejim.hyperkey Hyperkey.app
+          cp -R Resources/*.lproj Hyperkey.app/Contents/Resources/
+          codesign -f -s - --identifier com.smallmain.hyperkey Hyperkey.app
 
       - name: Zip app bundle
         run: |

@@ -1,24 +1,33 @@
 import ApplicationServices
 import Foundation
 
+@MainActor
 enum Accessibility {
-    /// Check if we have accessibility permissions.
-    /// If not, prompt the user and poll using the run loop (keeps app responsive).
-    static func ensureAccessibility() {
+    /// Prompt for accessibility permission if needed, then poll asynchronously
+    /// until the app becomes trusted.
+    static func waitForPermission(onGranted: @escaping @MainActor () -> Void) {
         let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
 
         if AXIsProcessTrustedWithOptions(options) {
+            onGranted()
             return
         }
 
         fputs("hyperkey: waiting for Accessibility permission...\n", stderr)
+        pollUntilTrusted(onGranted: onGranted)
+    }
 
-        // Poll using CFRunLoop instead of Thread.sleep so the app stays responsive
-        // and macOS doesn't show "not responding" dialogs.
-        while !AXIsProcessTrusted() {
-            CFRunLoopRunInMode(.defaultMode, 1.0, false)
+    private static func pollUntilTrusted(onGranted: @escaping @MainActor () -> Void) {
+        guard !AXIsProcessTrusted() else {
+            fputs("hyperkey: Accessibility permission granted.\n", stderr)
+            onGranted()
+            return
         }
 
-        fputs("hyperkey: Accessibility permission granted.\n", stderr)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            Task { @MainActor in
+                pollUntilTrusted(onGranted: onGranted)
+            }
+        }
     }
 }

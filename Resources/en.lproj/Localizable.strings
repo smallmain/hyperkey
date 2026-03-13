@@ -1,0 +1,50 @@
+"app.name" = "Hyperkey";
+"status_item.fallback_title" = "HK";
+
+"menu.version" = "%@ v%@";
+"menu.update_available" = "Update available";
+"menu.update_available_version" = "Update available: v%@";
+"menu.update_now" = "Update Now";
+"menu.downloading_update" = "Downloading Update...";
+"menu.check_for_updates" = "Check for Updates";
+"menu.checking_for_updates" = "Checking...";
+"menu.keyboards" = "Keyboards";
+"menu.no_keyboards" = "No keyboards detected";
+"menu.escape_on_tap" = "CapsLock alone → Escape";
+"menu.hyper_navigation" = "Hyper + HJKL → Arrows";
+"menu.launch_at_login" = "Launch at Login";
+"menu.quit" = "Quit %@";
+"menu.up_to_date" = "Up to date";
+
+"warning.waiting_accessibility" = "Waiting for Accessibility permission...";
+"warning.accessibility_revoked" = "Warning: Accessibility permission revoked";
+"warning.hid_mapping_failed" = "Warning: HID mapping failed";
+
+"keyboard.status.built_in" = "Built-in";
+"keyboard.status.seized" = "Seized";
+"keyboard.status.skipped" = "Skipped";
+"keyboard.name.unknown" = "Unknown Keyboard";
+"keyboard.item" = "%@ (%@)";
+
+"alert.update_check_failed.title" = "Unable to Check for Updates";
+"alert.update_failed.title" = "Update Failed";
+"alert.ok" = "OK";
+
+"update_check.error.invalid_response" = "GitHub returned an invalid response while checking for updates.";
+"update_check.error.github_status" = "GitHub returned HTTP %d while checking for updates.";
+"update_check.error.decode_failed" = "GitHub returned release data in an unexpected format.";
+"update_check.error.network_failure" = "Unable to reach GitHub: %@";
+
+"updater.error.missing_download_url" = "This release does not include a downloadable app bundle.";
+"updater.error.invalid_download_url" = "GitHub returned an invalid download URL for this release.";
+"updater.error.unsupported_installation" = "Immediate update only works when %@ is running from a .app bundle.";
+"updater.error.download_failed" = "GitHub returned HTTP %d while downloading the update.";
+"updater.error.network_failure" = "Unable to download the update: %@";
+"updater.error.extracted_app_not_found" = "The downloaded archive did not contain a %@ bundle.";
+"updater.error.prepare_temp_directory" = "Unable to prepare a temporary update directory.";
+"updater.error.stage_download" = "Unable to stage the downloaded update.";
+"updater.error.unpack_download" = "Unable to unpack the downloaded update.";
+"updater.error.invalid_response" = "GitHub returned an invalid response.";
+"updater.error.inspect_download" = "Unable to inspect the downloaded update.";
+"updater.error.prepare_installer" = "Unable to prepare the update installer.";
+"updater.error.launch_installer" = "Unable to launch the update installer.";

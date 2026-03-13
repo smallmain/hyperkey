@@ -6,6 +6,7 @@ import CoreGraphics
 /// synchronization is needed.
 nonisolated(unsafe) var hyperActive = false
 nonisolated(unsafe) var hyperUsedAsModifier = false
+nonisolated(unsafe) var hyperNavigationEnabled = false
 
 enum Constants {
     /// Virtual keycode for F18 (0x4F)
@@ -45,7 +46,11 @@ enum Constants {
     static let version = "0.2.0"
 
     /// GitHub repo for update checks
-    static let githubRepo = "feedthejim/hyperkey"
+    static let githubRepo = "smallmain/hyperkey"
+    /// Release asset used for in-app updates
+    static let releaseAssetName = "Hyperkey.zip"
+    /// App bundle name produced by release builds
+    static let appBundleName = "Hyperkey.app"
 
     /// CGEvent user data field for tagging events injected by the HID seizure path
     static let injectedEventField = CGEventField(rawValue: 43)!
@@ -53,5 +58,5 @@ enum Constants {
     static let injectedEventMarker: Int64 = 0x48594B45 // "HYKE"
 
     /// LaunchAgent label
-    static let bundleID = "com.feedthejim.hyperkey"
+    static let bundleID = "com.smallmain.hyperkey"
 }

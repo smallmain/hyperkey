@@ -93,9 +93,12 @@ private func eventTapCallback(
         return nil
     }
 
-    // Any other key while hyper is active: add modifier flags
+    // Any key while hyper is active: remap H/J/K/L to arrows, otherwise add Hyper flags
     if hyperActive && (type == .keyDown || type == .keyUp) {
         hyperUsedAsModifier = true
+        if let remappedEvent = remapHyperNavigationEvent(from: event, type: type) {
+            return remappedEvent
+        }
         event.flags = CGEventFlags(rawValue: event.flags.rawValue | Constants.hyperFlags.rawValue)
         return Unmanaged.passUnretained(event)
     }
@@ -127,4 +130,40 @@ private func deactivateHyper() -> Unmanaged<CGEvent>? {
     }
 
     return nil
+}
+
+/// Rewrites Hyper + H/J/K/L into arrow key events while preserving real modifier state.
+private func remapHyperNavigationEvent(
+    from event: CGEvent,
+    type: CGEventType
+) -> Unmanaged<CGEvent>? {
+    let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+    guard let arrowKeyCode = HyperNavigationMapping.arrowKeyCode(forVirtualKeyCode: keyCode) else {
+        return nil
+    }
+
+    let src = CGEventSource(stateID: .hidSystemState)
+    guard let remappedEvent = CGEvent(
+        keyboardEventSource: src,
+        virtualKey: arrowKeyCode,
+        keyDown: type == .keyDown
+    ) else {
+        return Unmanaged.passUnretained(event)
+    }
+
+    remappedEvent.flags = effectiveNavigationFlags(from: event.flags)
+    remappedEvent.timestamp = event.timestamp
+    remappedEvent.setIntegerValueField(
+        .keyboardEventAutorepeat,
+        value: event.getIntegerValueField(.keyboardEventAutorepeat)
+    )
+    remappedEvent.setIntegerValueField(
+        .keyboardEventKeyboardType,
+        value: event.getIntegerValueField(.keyboardEventKeyboardType)
+    )
+    return Unmanaged.passRetained(remappedEvent)
+}
+
+private func effectiveNavigationFlags(from flags: CGEventFlags) -> CGEventFlags {
+    CGEventFlags(rawValue: flags.rawValue & ~Constants.capsLockFlag.rawValue)
 }
